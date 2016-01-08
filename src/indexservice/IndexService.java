@@ -28,7 +28,7 @@ public class IndexService extends Thread{
             System.out.println("Buscado en el índice invertido...");
             DBObject queryDB = new BasicDBObject("palabra", query);
             DBCursor cursor = indiceInvertido.find(queryDB);
-            if(cursor.hasNext()){
+            if(cursor.hasNext()){ // Se busca la palabra en el indice invertido
                 DBObject objetoPresente = cursor.next();
                 IndexInvertido ind = new IndexInvertido((BasicDBObject) objetoPresente);
                 for (int i = 0; i < ind.docFrec.size(); i++) {
@@ -39,12 +39,17 @@ public class IndexService extends Thread{
                 }
                 
             }
+            else{ // No existe en el indice
+                System.out.println("No se han encontrado resultados en el indice invertido");
+            }
+            System.out.println("");
         } catch (Exception ex) {
             Logger.getLogger(IndexService.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     
     public String obtenerURL(String documentoURL, Mongo mongo){
+        // Abro las conexiones con MongoDB
         DB db = mongo.getDB("wikipediaIndex");
         DBCollection tablaDatos = db.getCollection("datosWiki");    
         String URL="";
