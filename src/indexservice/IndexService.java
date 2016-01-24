@@ -14,6 +14,8 @@ import java.util.logging.Logger;
 public class IndexService extends Thread{
     
     String query;
+    static String ipFront="192.168.31.247";
+    static String ipCaching="192.168.31.159";
     
     private IndexService(String query) {
         this.query = query;
@@ -46,7 +48,7 @@ public class IndexService extends Thread{
     
     public static void socketClienteDesdeIndexServiceHaciaFrontService(String respuestaAFrontService) throws Exception{        
         //Socket para el cliente (host, puerto)
-        Socket socketHaciaFrontService = new Socket("localhost", 5004);
+        Socket socketHaciaFrontService = new Socket(ipFront, 5004);
         
         //Buffer para enviar el dato al server
         DataOutputStream haciaElFrontService = new DataOutputStream(socketHaciaFrontService.getOutputStream());
@@ -60,7 +62,7 @@ public class IndexService extends Thread{
     
     public static void socketClienteDesdeIndexServiceHaciaCachingService(String respuestaACachingService) throws Exception{        
         //Socket para el cliente (host, puerto)
-        Socket socketHaciaCachingService = new Socket("localhost", 5005);
+        Socket socketHaciaCachingService = new Socket(ipCaching, 5005);
         
         //Buffer para enviar el dato al server
         DataOutputStream haciaElCachingService = new DataOutputStream(socketHaciaCachingService.getOutputStream());
