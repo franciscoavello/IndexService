@@ -14,8 +14,8 @@ import java.util.logging.Logger;
 public class IndexService extends Thread{
     
     String query;
-    static String ipFront="192.168.31.247";
-    static String ipCaching="192.168.31.115";
+    static String ipFront="localhost";
+    static String ipCaching="localhost";
     
     private IndexService(String query) {
         this.query = query;
