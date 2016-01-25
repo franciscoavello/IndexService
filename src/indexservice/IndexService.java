@@ -14,8 +14,8 @@ import java.util.logging.Logger;
 public class IndexService extends Thread{
     
     String query;
-    static String ipFront="localhost";
-    static String ipCaching="localhost";
+    static String ipFrontService="localhost";
+    static String ipCachingService="localhost";
     
     private IndexService(String query) {
         this.query = query;
@@ -48,7 +48,7 @@ public class IndexService extends Thread{
     
     public static void socketClienteDesdeIndexServiceHaciaFrontService(String respuestaAFrontService) throws Exception{        
         //Socket para el cliente (host, puerto)
-        Socket socketHaciaFrontService = new Socket(ipFront, 5004);
+        Socket socketHaciaFrontService = new Socket(ipFrontService, 5004);
         
         //Buffer para enviar el dato al server
         DataOutputStream haciaElFrontService = new DataOutputStream(socketHaciaFrontService.getOutputStream());
@@ -62,7 +62,7 @@ public class IndexService extends Thread{
     
     public static void socketClienteDesdeIndexServiceHaciaCachingService(String respuestaACachingService) throws Exception{        
         //Socket para el cliente (host, puerto)
-        Socket socketHaciaCachingService = new Socket(ipCaching, 5005);
+        Socket socketHaciaCachingService = new Socket(ipCachingService, 5005);
         
         //Buffer para enviar el dato al server
         DataOutputStream haciaElCachingService = new DataOutputStream(socketHaciaCachingService.getOutputStream());
@@ -81,38 +81,70 @@ public class IndexService extends Thread{
             DBCollection indiceInvertido = db.getCollection("indiceInvertido");
             System.out.println("(Index Service) Soy el thread: " + getName() + ". Recibi la query '" + query + "'. Buscando en el indice invertido");
             System.out.println("(Index Service) Buscado en el índice invertido...");
-            DBObject queryDB = new BasicDBObject("palabra", query);
-            DBCursor cursor = indiceInvertido.find(queryDB);
-            if(cursor.hasNext()){ // Se busca la palabra en el indice invertido
-                DBObject objetoPresente = cursor.next();
-                IndexInvertido ind = new IndexInvertido((BasicDBObject) objetoPresente);
-                String paraEnviar= new String();
-                for (int i = 0; i < ind.docFrec.size(); i++) {
-                    System.out.println("--------------------");
-                    System.out.println("Está en el documento: " + ind.docFrec.get(i).idDocumento);
-                    System.out.println("Con una frecuencia de: " + ind.docFrec.get(i).frecuencia);
-                    System.out.println("En la URL de wikipedia: " + obtenerURL(ind.docFrec.get(i).idDocumento,mongo));
-                    paraEnviar = paraEnviar.concat(ind.docFrec.get(i).idDocumento);
-                    paraEnviar = paraEnviar.concat("#");
-                    paraEnviar = paraEnviar.concat(ind.docFrec.get(i).frecuencia.toString());
-                    paraEnviar = paraEnviar.concat("#");
-                    paraEnviar = paraEnviar.concat(obtenerURL(ind.docFrec.get(i).idDocumento,mongo));
-                    if(i != ind.docFrec.size()-1){
+            String[] palabrasConsulta = query.split(" ");
+            String paraEnviar= new String();
+            String paraEnviarCaching = new String();
+            int cuantasCache=0;
+            for(int k=0; k<palabrasConsulta.length;k++){
+                query = palabrasConsulta[k];
+                DBObject queryDB = new BasicDBObject("palabra", query);
+                DBCursor cursor = indiceInvertido.find(queryDB);
+                if(cursor.hasNext()){// Se busca la palabra en el indice invertido
+                    cuantasCache++;
+                    DBObject objetoPresente = cursor.next();
+                    IndexInvertido ind = new IndexInvertido((BasicDBObject) objetoPresente);
+                    paraEnviarCaching = paraEnviarCaching.concat(query +",");
+                    for (int i = 0; i < ind.docFrec.size(); i++) {
+                        System.out.println("--------------------");
+                        System.out.println("Está en el documento: " + ind.docFrec.get(i).idDocumento);
+                        System.out.println("Con una frecuencia de: " + ind.docFrec.get(i).frecuencia);
+                        System.out.println("En la URL de wikipedia: " + obtenerURL(ind.docFrec.get(i).idDocumento,mongo));
+                        paraEnviar = paraEnviar.concat(ind.docFrec.get(i).idDocumento);
+                        paraEnviarCaching = paraEnviarCaching.concat(ind.docFrec.get(i).idDocumento);
+                        paraEnviar = paraEnviar.concat("#");
+                        paraEnviarCaching = paraEnviarCaching.concat("#");
+                        paraEnviar = paraEnviar.concat(ind.docFrec.get(i).frecuencia.toString());
+                        paraEnviarCaching = paraEnviarCaching.concat(ind.docFrec.get(i).frecuencia.toString());
+                        paraEnviar = paraEnviar.concat("#");
+                        paraEnviarCaching = paraEnviarCaching.concat("#");
+                        paraEnviar = paraEnviar.concat(obtenerURL(ind.docFrec.get(i).idDocumento,mongo));
+                        paraEnviarCaching = paraEnviarCaching.concat(obtenerURL(ind.docFrec.get(i).idDocumento,mongo));
+                        if(i != ind.docFrec.size()-1){
+                            paraEnviar = paraEnviar.concat(",");
+                            paraEnviarCaching = paraEnviarCaching.concat(",");
+                        }                    
+                    }
+                    paraEnviarCaching = paraEnviarCaching.concat(",*");
+                    if(k != palabrasConsulta.length-1){
+                        paraEnviarCaching = paraEnviarCaching.concat(",");
+                    }  
+                    if(k==palabrasConsulta.length-1){
+                        paraEnviarCaching = paraEnviarCaching.concat("," + cuantasCache); 
+                        socketClienteDesdeIndexServiceHaciaCachingService(paraEnviarCaching);
+                        socketClienteDesdeIndexServiceHaciaFrontService(paraEnviar);
+                    }
+                    else{
                         paraEnviar = paraEnviar.concat(",");
-                    }                    
+                    }     /*  
+                    String paraEnviarCaching = paraEnviar.concat(","+query); 
+                    socketClienteDesdeIndexServiceHaciaCachingService(paraEnviarCaching);
+                    socketClienteDesdeIndexServiceHaciaFrontService(paraEnviar);*/
                 }
-                String paraEnviarCaching = paraEnviar.concat(","+query); 
-                socketClienteDesdeIndexServiceHaciaCachingService(paraEnviarCaching);
-                socketClienteDesdeIndexServiceHaciaFrontService(paraEnviar);
+                else{ // No existe en el indice
+                    if(k==palabrasConsulta.length-1 || cuantasCache==0){
+                        System.out.println("(Index Service) No se han encontrado resultados en el indice invertido");
+                        String respuestaAFrontService = "MISS!!";
+                        socketClienteDesdeIndexServiceHaciaCachingService("NO");
+                        socketClienteDesdeIndexServiceHaciaFrontService(respuestaAFrontService);
+                    }/*
+                    System.out.println("(Index Service) No se han encontrado resultados en el indice invertido");
+                    String respuestaAFrontService = "MISS!!";
+                    socketClienteDesdeIndexServiceHaciaCachingService("NO");
+                    socketClienteDesdeIndexServiceHaciaFrontService(respuestaAFrontService);*/
+
+                }
+                System.out.println("");
             }
-            else{ // No existe en el indice
-                System.out.println("(Index Service) No se han encontrado resultados en el indice invertido");
-                String respuestaAFrontService = "MISS!!";
-                socketClienteDesdeIndexServiceHaciaCachingService("NO");
-                socketClienteDesdeIndexServiceHaciaFrontService(respuestaAFrontService);
-                
-            }
-            System.out.println("");
         } catch (Exception ex) {
             Logger.getLogger(IndexService.class.getName()).log(Level.SEVERE, null, ex);
         }
